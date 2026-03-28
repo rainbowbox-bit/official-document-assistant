@@ -223,6 +223,40 @@ code {
   letter-spacing: 0.06em;
 }
 
+/* ===== MODE TABS ===== */
+.mode-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 14px;
+  border: 2px solid var(--color-primary);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.mode-tab {
+  flex: 1;
+  padding: 10px 16px;
+  border: none;
+  background: transparent;
+  color: var(--color-primary);
+  font-family: var(--font-sans);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition);
+  letter-spacing: 0.04em;
+}
+.mode-tab.active {
+  background: var(--color-primary);
+  color: white;
+}
+.mode-tab:hover:not(.active) {
+  background: rgba(26,58,92,0.08);
+}
+[data-theme="dark"] .mode-tab:hover:not(.active) {
+  background: rgba(74,140,199,0.15);
+}
+
 /* ===== TABS ===== */
 .input-mode-tabs { display: flex; gap: 4px; }
 
@@ -363,6 +397,49 @@ code {
   align-items: center;
 }
 .char-count { font-size: 0.75rem; color: var(--color-text-muted); }
+
+/* ===== INITIATIVE MODE ===== */
+#initiative-purpose {
+  width: 100%;
+  min-height: 180px;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  font-family: var(--font-serif);
+  font-size: 0.875rem;
+  line-height: 1.85;
+  resize: vertical;
+  background: var(--color-bg);
+  color: var(--color-text);
+  transition: border-color var(--transition);
+}
+#initiative-purpose:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(26,58,92,0.12);
+}
+[data-theme="dark"] #initiative-purpose { background: #1a2440; }
+
+.form-section { margin-bottom: 14px; }
+.required-tag {
+  font-weight: 400;
+  font-size: 0.72rem;
+  background: var(--color-danger);
+  color: white;
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+
+/* History mode badge */
+.history-mode-badge {
+  font-size: 0.68rem;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-weight: 500;
+  margin-left: 6px;
+}
+.history-mode-badge.badge-reply { background: var(--color-primary); color: white; }
+.history-mode-badge.badge-initiative { background: var(--color-accent); color: #2c2c2c; }
 
 /* ===== AUTOSAVE STATUS ===== */
 .autosave-status {

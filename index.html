@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>公文助手 — 官方文書回覆生成系統</title>
+  <title>公文助手 — 官方文書生成系統</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;500;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
@@ -17,7 +17,7 @@
       <div class="header-brand">
         <span class="brand-icon" aria-hidden="true">📋</span>
         <h1>公文助手</h1>
-        <span class="brand-subtitle">官方文書回覆生成系統</span>
+        <span class="brand-subtitle">官方文書生成系統</span>
       </div>
       <nav class="header-actions">
         <button id="btn-dark-mode" class="btn-header" title="深色模式切換">
@@ -40,93 +40,162 @@
   <main class="main-layout">
 
     <!-- LEFT: Input Panel -->
-    <section class="panel panel-input" aria-label="來文輸入">
-      <div class="panel-header">
-        <h2>來文輸入</h2>
-        <div class="input-mode-tabs" role="tablist" aria-label="輸入方式">
-          <button class="tab-btn active" role="tab" aria-selected="true" data-tab="upload">上傳 PDF</button>
-          <button class="tab-btn" role="tab" aria-selected="false" data-tab="paste">貼上文字</button>
+    <section class="panel panel-input" aria-label="公文輸入">
+      <!-- Mode Toggle -->
+      <div class="mode-tabs" role="tablist" aria-label="功能模式">
+        <button class="mode-tab active" data-mode="reply">回文模式</button>
+        <button class="mode-tab" data-mode="initiative">主動函文</button>
+      </div>
+
+      <!-- ===== REPLY MODE ===== -->
+      <div id="mode-reply">
+        <div class="panel-header">
+          <h2 id="panel-input-title">來文輸入</h2>
+          <div class="input-mode-tabs" role="tablist" aria-label="輸入方式">
+            <button class="tab-btn active" role="tab" aria-selected="true" data-tab="upload">上傳 PDF</button>
+            <button class="tab-btn" role="tab" aria-selected="false" data-tab="paste">貼上文字</button>
+          </div>
+        </div>
+
+        <!-- PDF Upload Tab -->
+        <div class="tab-content active" id="tab-upload" role="tabpanel">
+          <div class="drop-zone" id="drop-zone" tabindex="0" role="button" aria-label="點擊或拖曳 PDF 檔案至此">
+            <div class="drop-zone-inner">
+              <span class="drop-icon" aria-hidden="true">📄</span>
+              <p class="drop-title">拖曳 PDF 檔案至此</p>
+              <p class="drop-hint">或</p>
+              <label for="file-input" class="btn btn-secondary">選擇檔案</label>
+              <input type="file" id="file-input" accept=".pdf" aria-label="選擇 PDF 檔案">
+            </div>
+          </div>
+
+          <div class="file-info" id="file-info" hidden>
+            <span class="file-icon" aria-hidden="true">📄</span>
+            <span id="file-name" class="file-name-text"></span>
+            <span id="file-size" class="file-size-text"></span>
+            <button id="btn-clear-file" class="btn-text" aria-label="清除已選擇的檔案">✕ 清除</button>
+          </div>
+
+          <!-- File size warning -->
+          <div class="file-warning" id="file-warning" hidden>
+            <span aria-hidden="true">⚠️</span>
+            <span id="file-warning-text"></span>
+          </div>
+
+          <div class="pdf-preview" id="pdf-preview" hidden>
+            <div class="pdf-preview-header">
+              <span class="pdf-preview-label">擷取文字預覽</span>
+              <span id="pdf-char-count" class="char-count-badge"></span>
+            </div>
+            <pre id="pdf-text-preview" aria-live="polite"></pre>
+          </div>
+        </div>
+
+        <!-- Text Paste Tab -->
+        <div class="tab-content" id="tab-paste" role="tabpanel" hidden>
+          <textarea
+            id="text-input"
+            placeholder="請將公文內容貼上於此&#10;&#10;例：&#10;受文者：○○部○○司&#10;發文日期：中華民國○○年○月○日&#10;發文字號：○○字第○○○○○號&#10;主旨：○○○○○○，請查照。&#10;說明：&#10;一、○○○○。&#10;二、○○○○。"
+            aria-label="公文文字內容"
+          ></textarea>
+          <div class="input-footer">
+            <span id="autosave-status" class="autosave-status"></span>
+            <span class="char-count"><span id="char-count">0</span> 字元</span>
+          </div>
+        </div>
+
+        <!-- Metadata Fields (Reply) -->
+        <div class="metadata-section">
+          <h3 class="metadata-title">公文資訊 <span class="optional-tag">選填</span></h3>
+          <div class="form-grid">
+            <div class="form-row">
+              <label for="input-agency">來文機關</label>
+              <input type="text" id="input-agency" placeholder="例：行政院環境部" autocomplete="off">
+            </div>
+            <div class="form-row">
+              <label for="input-doc-type">公文種類</label>
+              <select id="input-doc-type">
+                <option value="auto">自動判斷</option>
+                <option value="func">函</option>
+                <option value="order">令</option>
+                <option value="brief">書函</option>
+                <option value="notice">公告</option>
+                <option value="report">簽／報告</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label for="input-direction">行文方向</label>
+              <select id="input-direction">
+                <option value="auto">自動判斷</option>
+                <option value="parallel">平行（貴機關）</option>
+                <option value="up">上行（鈞長）</option>
+                <option value="down">下行（該機關）</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label for="reply-agency">回文機關</label>
+              <input type="text" id="reply-agency" placeholder="例：○○部○○司" autocomplete="off">
+            </div>
+          </div>
         </div>
       </div>
 
-      <!-- PDF Upload Tab -->
-      <div class="tab-content active" id="tab-upload" role="tabpanel">
-        <div class="drop-zone" id="drop-zone" tabindex="0" role="button" aria-label="點擊或拖曳 PDF 檔案至此">
-          <div class="drop-zone-inner">
-            <span class="drop-icon" aria-hidden="true">📄</span>
-            <p class="drop-title">拖曳 PDF 檔案至此</p>
-            <p class="drop-hint">或</p>
-            <label for="file-input" class="btn btn-secondary">選擇檔案</label>
-            <input type="file" id="file-input" accept=".pdf" aria-label="選擇 PDF 檔案">
+      <!-- ===== INITIATIVE MODE ===== -->
+      <div id="mode-initiative" hidden>
+        <div class="panel-header">
+          <h2>發文需求</h2>
+        </div>
+
+        <!-- Purpose Description -->
+        <div class="form-section">
+          <label for="initiative-purpose" class="field-label">發文目的 <span class="required-tag">必填</span></label>
+          <textarea id="initiative-purpose" placeholder="請描述您要發文的目的和內容&#10;&#10;例：&#10;通知所屬各機關，自即日起辦理○○業務清查作業&#10;或：請求○○部協助提供○○統計資料"></textarea>
+          <div class="input-footer">
+            <span id="init-autosave-status" class="autosave-status"></span>
+            <span class="char-count"><span id="init-char-count">0</span> 字元</span>
           </div>
         </div>
 
-        <div class="file-info" id="file-info" hidden>
-          <span class="file-icon" aria-hidden="true">📄</span>
-          <span id="file-name" class="file-name-text"></span>
-          <span id="file-size" class="file-size-text"></span>
-          <button id="btn-clear-file" class="btn-text" aria-label="清除已選擇的檔案">✕ 清除</button>
-        </div>
-
-        <!-- File size warning -->
-        <div class="file-warning" id="file-warning" hidden>
-          <span aria-hidden="true">⚠️</span>
-          <span id="file-warning-text"></span>
-        </div>
-
-        <div class="pdf-preview" id="pdf-preview" hidden>
-          <div class="pdf-preview-header">
-            <span class="pdf-preview-label">擷取文字預覽</span>
-            <span id="pdf-char-count" class="char-count-badge"></span>
-          </div>
-          <pre id="pdf-text-preview" aria-live="polite"></pre>
-        </div>
-      </div>
-
-      <!-- Text Paste Tab -->
-      <div class="tab-content" id="tab-paste" role="tabpanel" hidden>
-        <textarea
-          id="text-input"
-          placeholder="請將公文內容貼上於此&#10;&#10;例：&#10;受文者：○○部○○司&#10;發文日期：中華民國○○年○月○日&#10;發文字號：○○字第○○○○○號&#10;主旨：○○○○○○，請查照。&#10;說明：&#10;一、○○○○。&#10;二、○○○○。"
-          aria-label="公文文字內容"
-        ></textarea>
-        <div class="input-footer">
-          <span id="autosave-status" class="autosave-status"></span>
-          <span class="char-count"><span id="char-count">0</span> 字元</span>
-        </div>
-      </div>
-
-      <!-- Metadata Fields -->
-      <div class="metadata-section">
-        <h3 class="metadata-title">公文資訊 <span class="optional-tag">選填</span></h3>
-        <div class="form-grid">
-          <div class="form-row">
-            <label for="input-agency">來文機關</label>
-            <input type="text" id="input-agency" placeholder="例：行政院環境部" autocomplete="off">
-          </div>
-          <div class="form-row">
-            <label for="input-doc-type">公文種類</label>
-            <select id="input-doc-type">
-              <option value="auto">自動判斷</option>
-              <option value="func">函</option>
-              <option value="order">令</option>
-              <option value="brief">書函</option>
-              <option value="notice">公告</option>
-              <option value="report">簽／報告</option>
-            </select>
-          </div>
-          <div class="form-row">
-            <label for="input-direction">行文方向</label>
-            <select id="input-direction">
-              <option value="auto">自動判斷</option>
-              <option value="parallel">平行（貴機關）</option>
-              <option value="up">上行（鈞長）</option>
-              <option value="down">下行（該機關）</option>
-            </select>
-          </div>
-          <div class="form-row">
-            <label for="reply-agency">回文機關</label>
-            <input type="text" id="reply-agency" placeholder="例：○○部○○司" autocomplete="off">
+        <!-- Structured Fields -->
+        <div class="metadata-section">
+          <h3 class="metadata-title">發文資訊 <span class="optional-tag">選填</span></h3>
+          <div class="form-grid">
+            <div class="form-row">
+              <label for="init-from-agency">發文機關</label>
+              <input type="text" id="init-from-agency" placeholder="例：教育部國民及學前教育署" autocomplete="off">
+            </div>
+            <div class="form-row">
+              <label for="init-to-agency">受文機關</label>
+              <input type="text" id="init-to-agency" placeholder="例：各直轄市及縣市政府教育局" autocomplete="off">
+            </div>
+            <div class="form-row">
+              <label for="init-doc-type">公文種類</label>
+              <select id="init-doc-type">
+                <option value="auto">自動判斷</option>
+                <option value="func">函</option>
+                <option value="order">令</option>
+                <option value="brief">書函</option>
+                <option value="notice">公告</option>
+                <option value="report">簽／報告</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label for="init-direction">行文方向</label>
+              <select id="init-direction">
+                <option value="auto">自動判斷</option>
+                <option value="parallel">平行（貴機關）</option>
+                <option value="up">上行（鈞長）</option>
+                <option value="down">下行（該機關）</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label for="init-basis">法令依據</label>
+              <input type="text" id="init-basis" placeholder="例：依據○○法第○條規定（選填）" autocomplete="off">
+            </div>
+            <div class="form-row">
+              <label for="init-attachment">附件說明</label>
+              <input type="text" id="init-attachment" placeholder="例：檢附○○表乙份（選填）" autocomplete="off">
+            </div>
           </div>
         </div>
       </div>
@@ -142,9 +211,9 @@
     </section>
 
     <!-- RIGHT: Output Panel -->
-    <section class="panel panel-output" aria-label="生成回文">
+    <section class="panel panel-output" aria-label="生成結果">
       <div class="panel-header">
-        <h2>生成回文</h2>
+        <h2 id="panel-output-title">生成回文</h2>
         <div class="output-actions" id="output-actions" hidden>
           <button id="btn-copy" class="btn btn-secondary btn-sm">複製文字</button>
           <button id="btn-download" class="btn btn-secondary btn-sm">下載 .txt</button>

@@ -12,7 +12,12 @@ function clearChildren(el) {
 }
 
 const DOM = {
-  // Tabs
+  // Mode Tabs
+  modeTabs:        document.querySelectorAll('.mode-tab'),
+  modeReply:       $('mode-reply'),
+  modeInitiative:  $('mode-initiative'),
+
+  // Input Tabs
   tabBtns:         document.querySelectorAll('.tab-btn'),
 
   // PDF Upload
@@ -33,11 +38,25 @@ const DOM = {
   charCount:       $('char-count'),
   autosaveStatus:  $('autosave-status'),
 
-  // Metadata
+  // Reply Metadata
   inputAgency:     $('input-agency'),
   inputDocType:    $('input-doc-type'),
   inputDirection:  $('input-direction'),
   replyAgency:     $('reply-agency'),
+
+  // Initiative Fields
+  initPurpose:     $('initiative-purpose'),
+  initCharCount:   $('init-char-count'),
+  initAutosave:    $('init-autosave-status'),
+  initFromAgency:  $('init-from-agency'),
+  initToAgency:    $('init-to-agency'),
+  initDocType:     $('init-doc-type'),
+  initDirection:   $('init-direction'),
+  initBasis:       $('init-basis'),
+  initAttachment:  $('init-attachment'),
+
+  // Panel Titles
+  panelOutputTitle: $('panel-output-title'),
 
   // Generate
   btnGenerate:     $('btn-generate'),
@@ -99,6 +118,7 @@ const DOM = {
 
 /* ── 應用程式狀態 ── */
 const state = {
+  mode:               'reply',    // 'reply' | 'initiative'
   activeTab:          'upload',
   extractedPdfText:   '',
   isGenerating:       false,
@@ -135,6 +155,11 @@ function init() {
    事件綁定
    ==================================================== */
 function bindEvents() {
+  // 模式切換
+  DOM.modeTabs.forEach(btn => {
+    btn.addEventListener('click', () => switchMode(btn.dataset.mode));
+  });
+
   // 分頁切換
   DOM.tabBtns.forEach(btn => {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab));
@@ -168,6 +193,15 @@ function bindEvents() {
     updateGenerateButton();
     clearTimeout(autosaveTimer);
     autosaveTimer = setTimeout(saveDraft, AUTOSAVE_DELAY_MS);
+  });
+
+  // 主動函文輸入
+  let initAutosaveTimer = null;
+  DOM.initPurpose.addEventListener('input', () => {
+    DOM.initCharCount.textContent = DOM.initPurpose.value.length.toLocaleString();
+    updateGenerateButton();
+    clearTimeout(initAutosaveTimer);
+    initAutosaveTimer = setTimeout(saveDraft, AUTOSAVE_DELAY_MS);
   });
 
   // 生成 / 重試 / 重新生成
@@ -231,6 +265,30 @@ function switchTab(tab) {
   tabPaste.classList.toggle('active', tab === 'paste');
   tabUpload.hidden = tab !== 'upload';
   tabPaste.hidden  = tab !== 'paste';
+
+  updateGenerateButton();
+}
+
+/* ====================================================
+   模式切換
+   ==================================================== */
+function switchMode(mode) {
+  state.mode = mode;
+
+  DOM.modeTabs.forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.mode === mode);
+  });
+
+  DOM.modeReply.hidden = mode !== 'reply';
+  DOM.modeInitiative.hidden = mode !== 'initiative';
+
+  // 更新面板標題
+  DOM.panelOutputTitle.textContent = mode === 'reply' ? '生成回文' : '生成公文';
+
+  // 更新按鈕文字
+  if (!state.isGenerating) {
+    DOM.btnLabel.textContent = mode === 'reply' ? '生成回文' : '生成公文';
+  }
 
   updateGenerateButton();
 }
@@ -309,9 +367,14 @@ function clearFile() {
    生成按鈕狀態
    ==================================================== */
 function updateGenerateButton() {
-  const hasContent = state.activeTab === 'upload'
-    ? state.extractedPdfText.length > 0
-    : DOM.textInput.value.trim().length > 10;
+  let hasContent;
+  if (state.mode === 'initiative') {
+    hasContent = DOM.initPurpose.value.trim().length > 10;
+  } else {
+    hasContent = state.activeTab === 'upload'
+      ? state.extractedPdfText.length > 0
+      : DOM.textInput.value.trim().length > 10;
+  }
 
   DOM.btnGenerate.disabled = !hasContent || state.isGenerating;
 }
@@ -366,13 +429,43 @@ async function handleGenerate() {
     return;
   }
 
-  const documentText = state.activeTab === 'upload'
-    ? state.extractedPdfText
-    : DOM.textInput.value;
+  let systemPrompt, userPrompt, inputText;
 
-  if (!documentText.trim()) {
-    showToast('請先輸入或上傳公文內容', 'error');
-    return;
+  if (state.mode === 'initiative') {
+    const purpose = DOM.initPurpose.value.trim();
+    if (!purpose) {
+      showToast('請先輸入發文目的', 'error');
+      return;
+    }
+    inputText = purpose;
+    systemPrompt = DocumentFormatter.buildInitiativeSystemPrompt();
+    userPrompt = DocumentFormatter.buildInitiativeUserPrompt({
+      purpose,
+      fromAgency: DOM.initFromAgency.value.trim(),
+      toAgency:   DOM.initToAgency.value.trim(),
+      docType:    DOM.initDocType.value,
+      direction:  DOM.initDirection.value,
+      basis:      DOM.initBasis.value.trim(),
+      attachment: DOM.initAttachment.value.trim(),
+    });
+  } else {
+    const documentText = state.activeTab === 'upload'
+      ? state.extractedPdfText
+      : DOM.textInput.value;
+
+    if (!documentText.trim()) {
+      showToast('請先輸入或上傳公文內容', 'error');
+      return;
+    }
+    inputText = documentText;
+    systemPrompt = DocumentFormatter.buildSystemPrompt();
+    userPrompt = DocumentFormatter.buildUserPrompt({
+      documentText,
+      fromAgency: DOM.inputAgency.value.trim(),
+      docType:    DOM.inputDocType.value,
+      direction:  DOM.inputDirection.value,
+      replyAgency: DOM.replyAgency.value.trim(),
+    });
   }
 
   state.isGenerating = true;
@@ -380,27 +473,18 @@ async function handleGenerate() {
   setOutputState('loading');
 
   try {
-    const systemPrompt = DocumentFormatter.buildSystemPrompt();
-    const userPrompt   = DocumentFormatter.buildUserPrompt({
-      documentText,
-      fromAgency: DOM.inputAgency.value.trim(),
-      docType:    DOM.inputDocType.value,
-      direction:  DOM.inputDirection.value,
-      replyAgency: DOM.replyAgency.value.trim(),
-    });
-
     const result = await GeminiApi.generateReply(systemPrompt, userPrompt);
 
     state.lastGeneratedText = result;
     DOM.outputText.textContent = result;
     setOutputState('result');
-    showToast('回文生成完成', 'success');
+    showToast(state.mode === 'initiative' ? '公文生成完成' : '回文生成完成', 'success');
 
     // 合規檢查
     runComplianceCheck(result);
 
     // 儲存到歷史
-    saveToHistory(documentText, result);
+    saveToHistory(inputText, result);
 
     // 啟動冷卻
     startCooldown();
@@ -417,7 +501,8 @@ async function handleGenerate() {
 }
 
 function setGeneratingUI(generating) {
-  DOM.btnLabel.textContent = generating ? '生成中⋯' : '生成回文';
+  const label = state.mode === 'initiative' ? '生成公文' : '生成回文';
+  DOM.btnLabel.textContent = generating ? '生成中⋯' : label;
   DOM.btnSpinner.hidden = !generating;
 }
 
@@ -491,17 +576,28 @@ function downloadOutput() {
    ==================================================== */
 function saveDraft() {
   const draft = {
+    mode: state.mode,
+    // Reply fields
     text: DOM.textInput.value,
     agency: DOM.inputAgency.value,
     docType: DOM.inputDocType.value,
     direction: DOM.inputDirection.value,
     replyAgency: DOM.replyAgency.value,
+    // Initiative fields
+    initPurpose: DOM.initPurpose.value,
+    initFromAgency: DOM.initFromAgency.value,
+    initToAgency: DOM.initToAgency.value,
+    initDocType: DOM.initDocType.value,
+    initDirection: DOM.initDirection.value,
+    initBasis: DOM.initBasis.value,
+    initAttachment: DOM.initAttachment.value,
     savedAt: Date.now(),
   };
   try {
     localStorage.setItem(LS_DRAFT_KEY, JSON.stringify(draft));
-    DOM.autosaveStatus.textContent = '已自動儲存';
-    setTimeout(() => { DOM.autosaveStatus.textContent = ''; }, 2000);
+    const statusEl = state.mode === 'initiative' ? DOM.initAutosave : DOM.autosaveStatus;
+    statusEl.textContent = '已自動儲存';
+    setTimeout(() => { statusEl.textContent = ''; }, 2000);
   } catch { /* localStorage full — ignore */ }
 }
 
@@ -510,6 +606,7 @@ function restoreDraft() {
     const raw = localStorage.getItem(LS_DRAFT_KEY);
     if (!raw) return;
     const draft = JSON.parse(raw);
+    // Reply fields
     if (draft.text) {
       DOM.textInput.value = draft.text;
       DOM.charCount.textContent = draft.text.length.toLocaleString();
@@ -518,6 +615,21 @@ function restoreDraft() {
     if (draft.docType) DOM.inputDocType.value = draft.docType;
     if (draft.direction) DOM.inputDirection.value = draft.direction;
     if (draft.replyAgency) DOM.replyAgency.value = draft.replyAgency;
+    // Initiative fields
+    if (draft.initPurpose) {
+      DOM.initPurpose.value = draft.initPurpose;
+      DOM.initCharCount.textContent = draft.initPurpose.length.toLocaleString();
+    }
+    if (draft.initFromAgency) DOM.initFromAgency.value = draft.initFromAgency;
+    if (draft.initToAgency) DOM.initToAgency.value = draft.initToAgency;
+    if (draft.initDocType) DOM.initDocType.value = draft.initDocType;
+    if (draft.initDirection) DOM.initDirection.value = draft.initDirection;
+    if (draft.initBasis) DOM.initBasis.value = draft.initBasis;
+    if (draft.initAttachment) DOM.initAttachment.value = draft.initAttachment;
+    // Restore mode
+    if (draft.mode && draft.mode !== 'reply') {
+      switchMode(draft.mode);
+    }
     updateGenerateButton();
   } catch { /* corrupted data — ignore */ }
 }
@@ -536,6 +648,7 @@ function saveToHistory(inputText, outputText) {
   history.unshift({
     id: Date.now(),
     date: new Date().toLocaleString('zh-TW'),
+    mode: state.mode,
     inputPreview: inputText.trim().slice(0, 80),
     outputPreview: outputText.trim().slice(0, 120),
     output: outputText,
@@ -567,6 +680,14 @@ function openHistoryModal() {
       const date = document.createElement('span');
       date.className = 'history-item-date';
       date.textContent = item.date;
+
+      if (item.mode) {
+        const badge = document.createElement('span');
+        badge.className = 'history-mode-badge ' + (item.mode === 'initiative' ? 'badge-initiative' : 'badge-reply');
+        badge.textContent = item.mode === 'initiative' ? '主動' : '回文';
+        date.appendChild(document.createTextNode(' '));
+        date.appendChild(badge);
+      }
 
       const del = document.createElement('button');
       del.className = 'history-item-delete';

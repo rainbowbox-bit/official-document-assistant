@@ -13,33 +13,30 @@ const DocumentFormatter = (() => {
     return `中華民國${y}年${d.getMonth() + 1}月${d.getDate()}日`;
   }
 
-  /* ── 系統提示詞（公文寫作規範） ── */
-  function buildSystemPrompt() {
-    return `你是一位精通中華民國政府公文寫作的專業助理，熟悉行政院訂頒之《文書處理手冊》及《公文格式條例》。
-你的任務是根據使用者提供的來文（原始公文），撰寫一份格式正確、用語規範的回文。
-今日日期：${getRocDate()}
-
+  /* ── 共用公文規則（壹～伍） ── */
+  function getDocumentRules() {
+    return `
 ══════════════════════════════════════════════════════
 壹、公文種類判斷原則
 ══════════════════════════════════════════════════════
 
-根據來文特徵，自動判斷公文種類並選用對應回文格式：
+根據需求特徵，判斷公文種類並選用對應格式：
 
 1. 函：受文者為機關，有主旨／說明／辦法結構
-   → 回文：函（依行文方向決定上行／平行／下行）
+   → 函（依行文方向決定上行／平行／下行）
 
 2. 令：上級機關對下級機關頒布規定或指示
-   → 回文：函（上行，以「呈」行文）
+   → 函（上行，以「呈」行文）
 
 3. 書函：非正式協調、內部聯繫
-   → 回文：書函（格式較簡）
+   → 書函（格式較簡）
 
 4. 公告：機關對公眾發布事項
-   → 回文：函（表示知悉或配合辦理）
+   → 公告格式
    ※ 公告免列受文者
 
 5. 簽／報告：機關內部陳核
-   → 回文：批示意見或函覆
+   → 批示意見或函覆
 
 ══════════════════════════════════════════════════════
 貳、行文方向與稱謂用語
@@ -141,7 +138,15 @@ const DocumentFormatter = (() => {
 ・機密件：標示「機密」，並註明保密期限
 ・極機密件：標示「極機密」
 ・絕對機密件：標示「絕對機密」
-・速別：最速件、速件、普通件
+・速別：最速件、速件、普通件`;
+  }
+
+  /* ── 系統提示詞（回文模式） ── */
+  function buildSystemPrompt() {
+    return `你是一位精通中華民國政府公文寫作的專業助理，熟悉行政院訂頒之《文書處理手冊》及《公文格式條例》。
+你的任務是根據使用者提供的來文（原始公文），撰寫一份格式正確、用語規範的回文。
+今日日期：${getRocDate()}
+${getDocumentRules()}
 
 ══════════════════════════════════════════════════════
 陸、格式範例（回文）
@@ -170,6 +175,43 @@ const DocumentFormatter = (() => {
 `;
   }
 
+  /* ── 系統提示詞（主動函文模式） ── */
+  function buildInitiativeSystemPrompt() {
+    return `你是一位精通中華民國政府公文寫作的專業助理，熟悉行政院訂頒之《文書處理手冊》及《公文格式條例》。
+你的任務是根據使用者描述的發文目的與需求，從零起草一份格式正確、用語規範的公文。
+今日日期：${getRocDate()}
+${getDocumentRules()}
+
+══════════════════════════════════════════════════════
+陸、格式範例（主動函文）
+══════════════════════════════════════════════════════
+
+受文者：○○局
+發文日期：中華民國114年○月○日
+發文字號：○○字第0000000000號
+速別：普通件
+密等及解密條件或保密期限：普通
+主旨：為○○○○事宜，請查照辦理。
+說明：
+一、依據○○法第○條規定辦理。
+二、○○○○○○○○○○○○○○○○○○○○○○○○○○○。
+三、請於○○年○月○日前辦理完竣，並函報辦理情形。
+四、如有疑問，請洽本部○○科（聯絡電話：02-○○○○○○○○）。
+正本：○○局
+副本：
+
+══════════════════════════════════════════════════════
+
+重要提示：
+・請直接輸出公文內容，不需要任何額外解釋或前言
+・主旨起首用「為○○事宜」，不用「復○○函」
+・說明第一項引述法令依據或直接陳述事由，不引述來函
+・未知的機關名稱以「○○機關」代替，字號以「○字第○○○號」代替
+・如需求資訊不足，以「○○○○」作為佔位符，並在說明中提示需補充
+・公告類公文免列受文者
+`;
+  }
+
   /* ── 組裝 User Prompt ── */
   function buildUserPrompt({ documentText, fromAgency, docType, direction, replyAgency }) {
     let prompt = '請根據以下來文，撰寫一份格式完整的回文：\n\n';
@@ -187,6 +229,29 @@ const DocumentFormatter = (() => {
     }
 
     prompt += '請直接輸出回文內容，不需要額外說明。';
+    return prompt;
+  }
+
+  /* ── 組裝 User Prompt（主動函文） ── */
+  function buildInitiativeUserPrompt({ purpose, fromAgency, toAgency, docType, direction, basis, attachment }) {
+    let prompt = '請根據以下需求，從零起草一份格式完整的公文：\n\n';
+    prompt += '══════════ 發文需求 ══════════\n\n';
+    prompt += purpose.trim();
+    prompt += '\n\n══════════════════════════════\n\n';
+
+    const hasInfo = fromAgency || toAgency || docType !== 'auto' || direction !== 'auto' || basis || attachment;
+    if (hasInfo) {
+      prompt += '【發文資訊】\n';
+      if (fromAgency)          prompt += `發文機關：${fromAgency}\n`;
+      if (toAgency)            prompt += `受文機關：${toAgency}\n`;
+      if (docType !== 'auto')  prompt += `公文種類：${docType}\n`;
+      if (direction !== 'auto') prompt += `行文方向：${direction}\n`;
+      if (basis)               prompt += `法令依據：${basis}\n`;
+      if (attachment)          prompt += `附件：${attachment}\n`;
+      prompt += '\n';
+    }
+
+    prompt += '請直接輸出公文內容，不需要額外說明。';
     return prompt;
   }
 
@@ -263,5 +328,5 @@ const DocumentFormatter = (() => {
     return results;
   }
 
-  return { buildSystemPrompt, buildUserPrompt, getRocFilename, getRocDate, checkCompliance };
+  return { buildSystemPrompt, buildUserPrompt, buildInitiativeSystemPrompt, buildInitiativeUserPrompt, getRocFilename, getRocDate, checkCompliance };
 })();
