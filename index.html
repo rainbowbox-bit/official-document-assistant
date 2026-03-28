@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>公文助手 — 官方文書回覆生成系統</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;500;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ===== HEADER ===== -->
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="header-brand">
+        <span class="brand-icon" aria-hidden="true">📋</span>
+        <h1>公文助手</h1>
+        <span class="brand-subtitle">官方文書回覆生成系統</span>
+      </div>
+      <nav class="header-actions">
+        <button id="btn-api-settings" class="btn-header" title="API 金鑰設定">
+          <span aria-hidden="true">⚙️</span> API 設定
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ===== MAIN TWO-PANEL LAYOUT ===== -->
+  <main class="main-layout">
+
+    <!-- LEFT: Input Panel -->
+    <section class="panel panel-input" aria-label="來文輸入">
+      <div class="panel-header">
+        <h2>來文輸入</h2>
+        <div class="input-mode-tabs" role="tablist" aria-label="輸入方式">
+          <button class="tab-btn active" role="tab" aria-selected="true" data-tab="upload">上傳 PDF</button>
+          <button class="tab-btn" role="tab" aria-selected="false" data-tab="paste">貼上文字</button>
+        </div>
+      </div>
+
+      <!-- PDF Upload Tab -->
+      <div class="tab-content active" id="tab-upload" role="tabpanel">
+        <div class="drop-zone" id="drop-zone" tabindex="0" role="button" aria-label="點擊或拖曳 PDF 檔案至此">
+          <div class="drop-zone-inner">
+            <span class="drop-icon" aria-hidden="true">📄</span>
+            <p class="drop-title">拖曳 PDF 檔案至此</p>
+            <p class="drop-hint">或</p>
+            <label for="file-input" class="btn btn-secondary">選擇檔案</label>
+            <input type="file" id="file-input" accept=".pdf" aria-label="選擇 PDF 檔案">
+          </div>
+        </div>
+
+        <div class="file-info" id="file-info" hidden>
+          <span class="file-icon" aria-hidden="true">📄</span>
+          <span id="file-name" class="file-name-text"></span>
+          <button id="btn-clear-file" class="btn-text" aria-label="清除已選擇的檔案">✕ 清除</button>
+        </div>
+
+        <div class="pdf-preview" id="pdf-preview" hidden>
+          <div class="pdf-preview-header">
+            <span class="pdf-preview-label">擷取文字預覽</span>
+            <span id="pdf-char-count" class="char-count-badge"></span>
+          </div>
+          <pre id="pdf-text-preview" aria-live="polite"></pre>
+        </div>
+      </div>
+
+      <!-- Text Paste Tab -->
+      <div class="tab-content" id="tab-paste" role="tabpanel" hidden>
+        <textarea
+          id="text-input"
+          placeholder="請將公文內容貼上於此&#10;&#10;例：&#10;受文者：○○部○○司&#10;發文日期：中華民國○○年○月○日&#10;發文字號：○○字第○○○○○號&#10;主旨：○○○○○○，請查照。&#10;說明：&#10;一、○○○○。&#10;二、○○○○。"
+          aria-label="公文文字內容"
+        ></textarea>
+        <div class="input-footer">
+          <span class="char-count"><span id="char-count">0</span> 字元</span>
+        </div>
+      </div>
+
+      <!-- Metadata Fields -->
+      <div class="metadata-section">
+        <h3 class="metadata-title">公文資訊 <span class="optional-tag">選填</span></h3>
+        <div class="form-grid">
+          <div class="form-row">
+            <label for="input-agency">來文機關</label>
+            <input type="text" id="input-agency" placeholder="例：行政院環境部" autocomplete="off">
+          </div>
+          <div class="form-row">
+            <label for="input-doc-type">公文種類</label>
+            <select id="input-doc-type">
+              <option value="auto">自動判斷</option>
+              <option value="func">函</option>
+              <option value="order">令</option>
+              <option value="brief">書函</option>
+              <option value="notice">公告</option>
+              <option value="report">簽／報告</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label for="input-direction">行文方向</label>
+            <select id="input-direction">
+              <option value="auto">自動判斷</option>
+              <option value="parallel">平行（貴機關）</option>
+              <option value="up">上行（鈞長）</option>
+              <option value="down">下行（該機關）</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label for="reply-agency">回文機關</label>
+            <input type="text" id="reply-agency" placeholder="例：○○部○○司" autocomplete="off">
+          </div>
+        </div>
+      </div>
+
+      <!-- Generate Button -->
+      <div class="action-bar">
+        <button id="btn-generate" class="btn btn-primary btn-large" disabled>
+          <span id="btn-label">生成回文</span>
+          <span id="btn-spinner" class="spinner" hidden aria-hidden="true"></span>
+        </button>
+      </div>
+    </section>
+
+    <!-- RIGHT: Output Panel -->
+    <section class="panel panel-output" aria-label="生成回文">
+      <div class="panel-header">
+        <h2>生成回文</h2>
+        <div class="output-actions" id="output-actions" hidden>
+          <button id="btn-copy" class="btn btn-secondary btn-sm">複製文字</button>
+          <button id="btn-download" class="btn btn-secondary btn-sm">下載 .txt</button>
+          <button id="btn-regenerate" class="btn btn-outline btn-sm">重新生成</button>
+        </div>
+      </div>
+
+      <!-- Empty State -->
+      <div class="output-state" id="output-empty">
+        <span class="state-icon" aria-hidden="true">📝</span>
+        <p>在左側輸入公文內容</p>
+        <p class="state-hint">點擊「生成回文」後結果將顯示於此</p>
+      </div>
+
+      <!-- Loading State -->
+      <div class="output-state" id="output-loading" hidden aria-live="polite" aria-label="正在生成">
+        <div class="loading-spinner" aria-hidden="true"></div>
+        <p>正在使用 Gemini AI 生成回文⋯</p>
+        <p class="state-hint">通常需要 10–30 秒，請稍候</p>
+      </div>
+
+      <!-- Error State -->
+      <div class="output-state output-state--error" id="output-error" hidden aria-live="assertive">
+        <span class="state-icon" aria-hidden="true">⚠️</span>
+        <p id="error-message" class="error-text"></p>
+        <button id="btn-retry" class="btn btn-secondary">重試</button>
+      </div>
+
+      <!-- Result -->
+      <div class="output-result" id="output-result" hidden>
+        <div class="document-paper">
+          <pre id="output-text" aria-label="生成的回文內容"></pre>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ===== API KEY MODAL ===== -->
+  <div class="modal-overlay" id="modal-api" role="dialog" aria-modal="true" aria-labelledby="modal-title" hidden>
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="modal-title">Gemini API 金鑰設定</h2>
+        <button class="modal-close" id="modal-close" aria-label="關閉設定">✕</button>
+      </div>
+      <div class="modal-body">
+
+        <!-- Key Input -->
+        <div class="api-key-section">
+          <label for="api-key-input" class="field-label">API 金鑰</label>
+          <div class="api-key-row">
+            <input
+              type="password"
+              id="api-key-input"
+              placeholder="貼上您的 Gemini API 金鑰（AIza...）"
+              autocomplete="off"
+              spellcheck="false"
+              aria-describedby="api-key-status"
+            >
+            <button id="btn-toggle-key" class="btn-icon-only" title="顯示或隱藏金鑰" aria-label="顯示或隱藏金鑰">👁️</button>
+          </div>
+          <div id="api-key-status" class="api-key-status" aria-live="polite"></div>
+        </div>
+
+        <div class="modal-btn-row">
+          <button id="btn-save-key" class="btn btn-primary">儲存金鑰</button>
+          <button id="btn-clear-key" class="btn btn-danger-outline">清除金鑰</button>
+        </div>
+
+        <hr class="modal-divider">
+
+        <!-- How-to Guide -->
+        <div class="api-guide">
+          <h3>如何取得 Gemini API 金鑰？</h3>
+          <ol class="guide-steps">
+            <li>
+              <strong>前往 Google AI Studio</strong><br>
+              開啟瀏覽器，前往
+              <a href="https://aistudio.google.com" target="_blank" rel="noopener noreferrer">aistudio.google.com ↗</a>
+            </li>
+            <li>
+              <strong>登入 Google 帳號</strong><br>
+              使用個人或機構 Google 帳號登入（建議使用個人帳號以避免機構政策限制）
+            </li>
+            <li>
+              <strong>建立 API 金鑰</strong><br>
+              點擊左側「Get API key」→「Create API key」→ 選擇或建立一個 Google Cloud 專案
+            </li>
+            <li>
+              <strong>複製並儲存</strong><br>
+              複製以「<code>AIza</code>」開頭的金鑰，貼至上方欄位後按「儲存金鑰」
+            </li>
+          </ol>
+
+          <div class="guide-notice guide-notice--info">
+            <span aria-hidden="true">🔒</span>
+            <p>
+              <strong>安全說明：</strong>API 金鑰僅儲存於您瀏覽器的 localStorage，
+              不會傳送至任何中間伺服器。所有 API 請求直接從您的瀏覽器發至 Google Gemini。
+            </p>
+          </div>
+          <div class="guide-notice guide-notice--tip">
+            <span aria-hidden="true">💡</span>
+            <p>
+              免費方案每分鐘最多 <strong>15 次</strong>請求，每日最多 <strong>1,500 次</strong>，
+              通常足夠日常公文處理使用。
+            </p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== TOAST ===== -->
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+  <!-- ===== SCRIPTS ===== -->
+  <!-- PDF.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    if (typeof pdfjsLib !== 'undefined') {
+      pdfjsLib.GlobalWorkerOptions.workerSrc =
+        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+  </script>
+  <!-- App modules (order matters) -->
+  <script src="document-formatter.js"></script>
+  <script src="pdf-handler.js"></script>
+  <script src="gemini-api.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
