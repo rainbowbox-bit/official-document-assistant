@@ -36,6 +36,7 @@ const DocumentFormatter = (() => {
 
 4. 公告：機關對公眾發布事項
    → 回文：函（表示知悉或配合辦理）
+   ※ 公告免列受文者
 
 5. 簽／報告：機關內部陳核
    → 回文：批示意見或函覆
@@ -66,6 +67,12 @@ const DocumentFormatter = (() => {
 注意：
 ・機關名稱第一次出現用全名，後續可縮稱
 ・若行文方向不明確，預設使用平行文（貴機關）用語
+
+【敬語層級區分】
+・「恭」：對總統用（恭請鑒核）
+・「謹」：對上級機關用（謹陳核示、謹請鑒核）
+・「敬」：對平級或禮貌性用（敬請查照、敬復者）
+・「請」：對下級機關用（請查照辦理、請辦理見覆）
 
 ══════════════════════════════════════════════════════
 參、各段落撰寫規則
@@ -119,7 +126,25 @@ const DocumentFormatter = (() => {
 ・省略號用「⋯⋯」（六點）
 
 ══════════════════════════════════════════════════════
-伍、格式範例（回文）
+伍、附件與密等格式
+══════════════════════════════════════════════════════
+
+【附件格式】
+・附件名稱列於主旨或說明中，格式：「檢附○○○○乙份」
+・附件序號：附件一、附件二⋯⋯
+・附件名稱應具體明確，避免僅寫「如附件」
+・若為表格、清單等，註明「詳如附件○○表」
+
+【密等標示】
+・普通件：標示「普通」或不標示
+・密件：標示「密」，並註明解密條件或保密期限
+・機密件：標示「機密」，並註明保密期限
+・極機密件：標示「極機密」
+・絕對機密件：標示「絕對機密」
+・速別：最速件、速件、普通件
+
+══════════════════════════════════════════════════════
+陸、格式範例（回文）
 ══════════════════════════════════════════════════════
 
 受文者：○○部○○司
@@ -141,6 +166,7 @@ const DocumentFormatter = (() => {
 ・請直接輸出公文內容，不需要任何額外解釋或前言
 ・未知的機關名稱以「○○機關」代替，字號以「○字第○○○號」代替
 ・如來文資訊不足，以「○○○○」作為佔位符，並在說明中提示需補充
+・公告類公文免列受文者
 `;
   }
 
@@ -173,5 +199,69 @@ const DocumentFormatter = (() => {
     return `回文_${y}${m}${day}.txt`;
   }
 
-  return { buildSystemPrompt, buildUserPrompt, getRocFilename };
+  /* ── 公文格式合規檢查 ── */
+  function checkCompliance(text) {
+    const results = [];
+
+    // 1. 日期格式：應使用民國紀年
+    const hasRocDate = /中華民國\d{2,3}年/.test(text);
+    const hasWesternDate = /20\d{2}年/.test(text);
+    if (hasRocDate && !hasWesternDate) {
+      results.push({ status: 'pass', label: '日期格式', detail: '使用民國紀年' });
+    } else if (hasWesternDate) {
+      results.push({ status: 'fail', label: '日期格式', detail: '偵測到西元紀年，應改用民國紀年' });
+    } else {
+      results.push({ status: 'warn', label: '日期格式', detail: '未偵測到日期，請確認是否需要標注日期' });
+    }
+
+    // 2. 機關稱謂
+    const hasProperTitle = /鈞|貴|該|本/.test(text);
+    if (hasProperTitle) {
+      results.push({ status: 'pass', label: '機關稱謂', detail: '使用正式機關稱謂用語' });
+    } else {
+      results.push({ status: 'warn', label: '機關稱謂', detail: '未偵測到正式機關稱謂（鈞／貴／該／本）' });
+    }
+
+    // 3. 主旨長度
+    const subjectMatch = text.match(/主旨[：:](.+?)(?=\n說明|\n辦法|\n正本|$)/s);
+    if (subjectMatch) {
+      const subjectLen = subjectMatch[1].trim().length;
+      if (subjectLen <= 150) {
+        results.push({ status: 'pass', label: '主旨長度', detail: `${subjectLen} 字（建議 150 字以內）` });
+      } else {
+        results.push({ status: 'fail', label: '主旨長度', detail: `${subjectLen} 字，超過建議的 150 字上限` });
+      }
+    } else {
+      results.push({ status: 'warn', label: '主旨長度', detail: '未偵測到主旨段落' });
+    }
+
+    // 4. 標點符號
+    const commaCount = (text.match(/，/g) || []).length;
+    const periodCount = (text.match(/。/g) || []).length;
+    if (commaCount === 0 && periodCount > 0) {
+      results.push({ status: 'pass', label: '標點符號', detail: '未使用「，」，符合公文用法' });
+    } else if (commaCount > 0) {
+      results.push({ status: 'warn', label: '標點符號', detail: `偵測到 ${commaCount} 個「，」，公文慣例不用逗號斷句` });
+    } else {
+      results.push({ status: 'warn', label: '標點符號', detail: '未偵測到「。」結尾' });
+    }
+
+    // 5. 結構完整性
+    const hasSubject = /主旨[：:]/.test(text);
+    const hasExplanation = /說明[：:]/.test(text);
+    const hasRecipient = /受文者[：:]|正本[：:]/.test(text);
+    if (hasSubject && hasExplanation && hasRecipient) {
+      results.push({ status: 'pass', label: '結構完整', detail: '包含主旨、說明、受文者' });
+    } else {
+      const missing = [];
+      if (!hasSubject) missing.push('主旨');
+      if (!hasExplanation) missing.push('說明');
+      if (!hasRecipient) missing.push('受文者/正本');
+      results.push({ status: 'warn', label: '結構完整', detail: `缺少：${missing.join('、')}` });
+    }
+
+    return results;
+  }
+
+  return { buildSystemPrompt, buildUserPrompt, getRocFilename, getRocDate, checkCompliance };
 })();

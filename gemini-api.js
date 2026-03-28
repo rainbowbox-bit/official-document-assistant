@@ -74,7 +74,10 @@ const GeminiApi = (() => {
         body: JSON.stringify(body)
       });
     } catch {
-      throw new Error('網路連線失敗，請確認網路狀態後重試');
+      throw new GeminiError(
+        '網路連線失敗，請確認網路狀態後重試',
+        '請檢查您的網路連線是否正常。如果使用 VPN 或防火牆，可能需要調整設定允許連線至 googleapis.com。'
+      );
     }
 
     if (!response.ok) {
@@ -82,42 +85,74 @@ const GeminiApi = (() => {
       const msg = errData?.error?.message || '';
 
       if (response.status === 400) {
-        throw new Error('API 金鑰無效或請求格式錯誤，請至設定重新確認金鑰（' + (msg || '400') + '）');
+        throw new GeminiError(
+          'API 金鑰無效或請求格式錯誤',
+          '請至右上角「API 設定」重新確認金鑰是否正確。金鑰應以「AIza」開頭。如金鑰正確但仍出錯，可能是金鑰已被撤銷，請至 Google AI Studio 重新產生。'
+        );
       }
       if (response.status === 403) {
-        throw new Error('API 金鑰無存取權限，請至 Google AI Studio 確認已啟用 Generative Language API');
+        throw new GeminiError(
+          'API 金鑰無存取權限',
+          '請至 Google AI Studio (aistudio.google.com) 確認已啟用 Generative Language API。如使用機構帳號，可能受組織政策限制，建議改用個人 Google 帳號。'
+        );
       }
       if (response.status === 429) {
-        throw new Error('已超過 API 使用限制（免費方案每分鐘最多 15 次），請稍候 1 分鐘後重試');
+        throw new GeminiError(
+          '已超過 API 使用限制',
+          '免費方案每分鐘最多 15 次請求。請等待約 1 分鐘後重試。如經常遇到此問題，可至 Google Cloud Console 升級為付費方案。'
+        );
       }
       if (response.status >= 500) {
-        throw new Error(`Google Gemini 服務暫時異常（${response.status}），請稍後重試`);
+        throw new GeminiError(
+          `Google Gemini 服務暫時異常（${response.status}）`,
+          '這是 Google 伺服器端的問題，非您的設定問題。通常幾分鐘後會恢復正常，請稍後重試。'
+        );
       }
-      throw new Error(`API 回應錯誤 ${response.status}：${msg || '未知錯誤'}`);
+      throw new GeminiError(
+        `API 回應錯誤 ${response.status}`,
+        msg || '未知錯誤，請確認網路連線及 API 金鑰是否正確。'
+      );
     }
 
     const data = await response.json();
     const candidate = data?.candidates?.[0];
 
     if (!candidate) {
-      throw new Error('API 未回傳有效候選結果，請重試');
+      throw new GeminiError(
+        'API 未回傳有效候選結果',
+        '請重試一次。如果持續發生，可能是輸入的公文內容觸發了 API 限制。'
+      );
     }
     if (candidate.finishReason === 'SAFETY') {
-      throw new Error('內容被 Gemini 安全過濾器攔截，請確認輸入的公文內容是否適當');
+      throw new GeminiError(
+        '內容被 Gemini 安全過濾器攔截',
+        '請確認輸入的公文內容是否包含敏感詞彙。您可以嘗試移除可能觸發過濾的內容後重試。'
+      );
     }
     if (candidate.finishReason === 'MAX_TOKENS') {
-      // 部分結果仍可用
       const partialText = candidate?.content?.parts?.[0]?.text;
       if (partialText) return partialText.trim() + '\n\n（注意：回文已達最大長度限制，可能不完整）';
     }
 
     const text = candidate?.content?.parts?.[0]?.text;
     if (!text) {
-      throw new Error('API 回傳內容為空，請重試');
+      throw new GeminiError(
+        'API 回傳內容為空',
+        '請重試一次。如持續發生，請嘗試縮短輸入的公文內容。'
+      );
     }
 
     return text.trim();
   }
 
-  return { saveApiKey, getApiKey, clearApiKey, hasApiKey, generateReply };
+  /* ── 自訂錯誤類別（含建議提示） ── */
+  class GeminiError extends Error {
+    constructor(message, hint) {
+      super(message);
+      this.name = 'GeminiError';
+      this.hint = hint || '';
+    }
+  }
+
+  return { saveApiKey, getApiKey, clearApiKey, hasApiKey, generateReply, GeminiError };
 })();

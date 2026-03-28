@@ -6,6 +6,30 @@
 
 const PdfHandler = (() => {
 
+  const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB hard limit
+  const WARN_FILE_SIZE = 10 * 1024 * 1024; // 10 MB warning threshold
+
+  /* ── 格式化檔案大小 ── */
+  function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  /* ── 檢查檔案大小 ── */
+  function checkFileSize(file) {
+    const size = file.size;
+    const sizeText = formatFileSize(size);
+
+    if (size > MAX_FILE_SIZE) {
+      return { ok: false, sizeText, warning: null, error: `檔案大小 ${sizeText} 超過上限（50 MB），請選擇較小的檔案` };
+    }
+    if (size > WARN_FILE_SIZE) {
+      return { ok: true, sizeText, warning: `檔案較大（${sizeText}），擷取文字可能需要較長時間`, error: null };
+    }
+    return { ok: true, sizeText, warning: null, error: null };
+  }
+
   /* ── 從 File 物件擷取所有文字 ── */
   async function extractTextFromFile(file) {
     if (!file || file.type !== 'application/pdf') {
@@ -14,6 +38,11 @@ const PdfHandler = (() => {
 
     if (typeof pdfjsLib === 'undefined') {
       throw new Error('PDF 函式庫載入失敗，請確認網路連線後重新整理頁面');
+    }
+
+    const sizeCheck = checkFileSize(file);
+    if (!sizeCheck.ok) {
+      throw new Error(sizeCheck.error);
     }
 
     const arrayBuffer = await file.arrayBuffer();
@@ -71,5 +100,5 @@ const PdfHandler = (() => {
     return { valid: true };
   }
 
-  return { extractTextFromFile, validateDocumentText };
+  return { extractTextFromFile, validateDocumentText, checkFileSize, formatFileSize };
 })();

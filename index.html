@@ -20,6 +20,15 @@
         <span class="brand-subtitle">官方文書回覆生成系統</span>
       </div>
       <nav class="header-actions">
+        <button id="btn-dark-mode" class="btn-header" title="深色模式切換">
+          <span id="dark-mode-icon" aria-hidden="true">🌙</span>
+        </button>
+        <button id="btn-history" class="btn-header" title="生成歷史紀錄">
+          <span aria-hidden="true">📜</span> 歷史
+        </button>
+        <button id="btn-templates" class="btn-header" title="常見公文範本">
+          <span aria-hidden="true">📑</span> 範本
+        </button>
         <button id="btn-api-settings" class="btn-header" title="API 金鑰設定">
           <span aria-hidden="true">⚙️</span> API 設定
         </button>
@@ -55,7 +64,14 @@
         <div class="file-info" id="file-info" hidden>
           <span class="file-icon" aria-hidden="true">📄</span>
           <span id="file-name" class="file-name-text"></span>
+          <span id="file-size" class="file-size-text"></span>
           <button id="btn-clear-file" class="btn-text" aria-label="清除已選擇的檔案">✕ 清除</button>
+        </div>
+
+        <!-- File size warning -->
+        <div class="file-warning" id="file-warning" hidden>
+          <span aria-hidden="true">⚠️</span>
+          <span id="file-warning-text"></span>
         </div>
 
         <div class="pdf-preview" id="pdf-preview" hidden>
@@ -75,6 +91,7 @@
           aria-label="公文文字內容"
         ></textarea>
         <div class="input-footer">
+          <span id="autosave-status" class="autosave-status"></span>
           <span class="char-count"><span id="char-count">0</span> 字元</span>
         </div>
       </div>
@@ -120,6 +137,7 @@
           <span id="btn-label">生成回文</span>
           <span id="btn-spinner" class="spinner" hidden aria-hidden="true"></span>
         </button>
+        <div id="cooldown-hint" class="cooldown-hint" hidden></div>
       </div>
     </section>
 
@@ -130,6 +148,7 @@
         <div class="output-actions" id="output-actions" hidden>
           <button id="btn-copy" class="btn btn-secondary btn-sm">複製文字</button>
           <button id="btn-download" class="btn btn-secondary btn-sm">下載 .txt</button>
+          <button id="btn-print" class="btn btn-secondary btn-sm">列印</button>
           <button id="btn-regenerate" class="btn btn-outline btn-sm">重新生成</button>
         </div>
       </div>
@@ -152,13 +171,20 @@
       <div class="output-state output-state--error" id="output-error" hidden aria-live="assertive">
         <span class="state-icon" aria-hidden="true">⚠️</span>
         <p id="error-message" class="error-text"></p>
+        <p id="error-hint" class="error-hint"></p>
         <button id="btn-retry" class="btn btn-secondary">重試</button>
       </div>
 
       <!-- Result -->
       <div class="output-result" id="output-result" hidden>
-        <div class="document-paper">
+        <div class="document-paper" id="printable-doc">
           <pre id="output-text" aria-label="生成的回文內容"></pre>
+        </div>
+
+        <!-- Compliance Checklist -->
+        <div class="compliance-checklist" id="compliance-checklist" hidden>
+          <h3 class="checklist-title">公文格式檢查</h3>
+          <ul id="checklist-items" class="checklist-items"></ul>
         </div>
       </div>
     </section>
@@ -241,6 +267,39 @@
           </div>
         </div>
 
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== HISTORY MODAL ===== -->
+  <div class="modal-overlay" id="modal-history" role="dialog" aria-modal="true" aria-labelledby="history-title" hidden>
+    <div class="modal modal-wide">
+      <div class="modal-header">
+        <h2 id="history-title">生成歷史紀錄</h2>
+        <button class="modal-close" id="history-close" aria-label="關閉歷史">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="history-empty" class="history-empty">
+          <p>尚無歷史紀錄</p>
+        </div>
+        <div id="history-list" class="history-list"></div>
+        <div class="modal-btn-row" id="history-actions" hidden>
+          <button id="btn-clear-history" class="btn btn-danger-outline">清除所有歷史</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== TEMPLATE LIBRARY MODAL ===== -->
+  <div class="modal-overlay" id="modal-templates" role="dialog" aria-modal="true" aria-labelledby="templates-title" hidden>
+    <div class="modal modal-wide">
+      <div class="modal-header">
+        <h2 id="templates-title">常見公文範本</h2>
+        <button class="modal-close" id="templates-close" aria-label="關閉範本">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="templates-hint">選擇範本後將自動填入左側輸入欄位，可根據需求修改</p>
+        <div id="template-list" class="template-list"></div>
       </div>
     </div>
   </div>
