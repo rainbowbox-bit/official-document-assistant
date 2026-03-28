@@ -679,6 +679,18 @@ code {
   to   { opacity: 1; transform: translate(-50%, 0); }
 }
 
+/* ===== FOOTER ===== */
+.app-footer {
+  flex-shrink: 0;
+  text-align: center;
+  padding: 5px;
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  background: var(--color-bg);
+  border-top: 1px solid var(--color-border-light);
+  opacity: 0.7;
+}
+
 /* ===== SCROLLBAR (Webkit) ===== */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
